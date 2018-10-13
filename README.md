@@ -6,5 +6,6 @@ A raytracer in modern C++, just for fun. No promises.
 
 You can set up in Docker (or separately, using the [Dockerfile](Dockerfile) as a guide):
 
-    ./prepare
-    ./check
+    ./run prepare
+    ./run check
+    ./run render -- --width=1024 data/example.json example.bmp
