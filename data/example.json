@@ -1,16 +1,29 @@
 {
     "camera": {
         "position": [-10, 0, 0],
-        "orientation": [1, 0, 0],
-        "fov": 1.57
+        "forward": [1, 0, 0],
+        "up": [0, 0, 1],
+        "fov": 1.57,
+        "aspect": 1.5
+    },
+    "ambient": {
+        "colour": [0.1, 0.1, 0.1, 1.0]
     },
     "root": {
         "type": "group",
         "children": [
             {
+                "type": "light",
+                "position": [10, 10, 20],
+                "colour": [0.9, 0.9, 0.9, 1.0]
+            },
+            {
                 "type": "plane",
                 "position": [0, 0, -5],
-                "normal": [0, 0, 1]
+                "normal": [0, 0, 1],
+                "material": {
+                    "colour": [0.8, 0.8, 0.8, 1.0]
+                }
             },
             {
                 "type": "group",
@@ -20,7 +33,10 @@
                     {
                         "type": "sphere",
                         "position": [0, 0, 0],
-                        "radius": 5
+                        "radius": 5,
+                        "material": {
+                            "colour": [0.2, 0.3, 1.0, 1.0]
+                        }
                     }
                 ]
             }

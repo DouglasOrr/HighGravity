@@ -19,4 +19,5 @@ RUN cd /usr/include \
     && mkdir catch2 nlohmann cxxopts \
     && wget https://raw.githubusercontent.com/catchorg/Catch2/v2.4.1/single_include/catch2/catch.hpp -qO catch2/catch.hpp \
     && wget https://raw.githubusercontent.com/nlohmann/json/v3.3.0/single_include/nlohmann/json.hpp -qO nlohmann/json.hpp \
+    && wget https://raw.githubusercontent.com/nlohmann/json/v3.3.0/include/nlohmann/json_fwd.hpp -qO nlohmann/json_fwd.hpp \
     && wget https://raw.githubusercontent.com/jarro2783/cxxopts/v2.1.1/include/cxxopts.hpp -qO cxxopts/cxxopts.hpp

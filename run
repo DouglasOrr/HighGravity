@@ -34,7 +34,7 @@ def run(args):
 
 def cmake(target):
     docker('cmake -GNinja -B{build} -H. -DCMAKE_BUILD_TYPE=debug', build=BUILD)
-    docker('cmake --build {build} --target {target}', build=BUILD, target=target)
+    docker('ninja -C {build} {target}', build=BUILD, target=target)
 
 
 def check():
@@ -46,11 +46,11 @@ def check():
 def render(args, debug):
     """Render a scene"""
     cmake('render')
-    cmd = './{build}/render {args}'.format(build=BUILD, args=' '.join(args))
     if debug:
-        docker('lldb -bo run {}', cmd, _docker_args='--privileged')
+        docker('lldb -bo run ./{build}/render -- {args}',
+               build=BUILD, args=' '.join(args), _docker_args='--privileged')
     else:
-        docker(cmd)
+        docker('./{build}/render {args}', build=BUILD, args=' '.join(args))
 
 
 parser = argparse.ArgumentParser('Docker runner script for common tasks')

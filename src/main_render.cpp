@@ -10,17 +10,11 @@ using json = nlohmann::json;
 
 namespace {
 
-  void read_scene_json(const std::string& path) {
-    std::ifstream in(path);
-    auto root = json::parse(in);
-    std::cout << root << std::endl;
-  }
-
   char pixel_float_to_char(float value) {
     return 255 * std::max(std::min(value, 1.0f), 0.0f);
   }
 
-  void write_image_bmp(const high_gravity::Image& image, const std::string& path) {
+  void write_image_bmp(std::ofstream& out, const high_gravity::Image& image) {
     // WARNING: this only works on little-endian architectures
 
     // 1. Build the header
@@ -75,7 +69,6 @@ namespace {
     header.num_colours_used = 0;
 
     // 2. Write the data
-    std::ofstream out(path, std::ios_base::binary);
     out.write(header.data, HeaderSize);
     char pixel_data[4];
     for (unsigned y = 0; y < image.height; ++y) {
@@ -98,27 +91,27 @@ int main(int argc, char** argv) {
   options.add_options()
     ("i,input", "Scene to render, specified from a JSON file", cxxopts::value<std::string>())
     ("o,output", "Image file to write", cxxopts::value<std::string>())
+    ("w,width", "Width of the image to render (height will be set according to aspect ratio)",
+     cxxopts::value<unsigned>()->default_value("128"))
     ("h,help", "Print help");
   options.parse_positional({"input", "output"});
 
   try {
-    auto result = options.parse(argc, argv);
-    if (result.count("help")) {
+    auto args = options.parse(argc, argv);
+    if (args.count("help")) {
       std::cerr << options.help() << std::endl;
 
-    } else if (result.count("input") and result.count("output")) {
-      read_scene_json(result["input"].as<std::string>());
+    } else if (args.count("input") and args.count("output")) {
+      auto input = args["input"].as<std::string>();
+      auto output = args["output"].as<std::string>();
 
-      // Fake rendering (temporary)
-      high_gravity::Image image(128, 64);
-      for (auto y = 0u; y < image.height; ++y) {
-        for (auto x = 0u; x < image.width; ++x) {
-          float g = static_cast<float>(y) / (image.height - 1);
-          float b = static_cast<float>(x) / (image.width - 1);
-          image(x, y) = {0, g, b, 1};
-        }
-      }
-      write_image_bmp(image, result["output"].as<std::string>());
+      std::ifstream in(input);
+      auto scene = high_gravity::Scene::from_json(json::parse(in));
+      auto image = high_gravity::render(scene, args["width"].as<unsigned>());
+
+      std::ofstream out(output, std::ios_base::binary);
+      write_image_bmp(out, image);
+      std::cerr << "Rendered " << input << " -> " << output << std::endl;
 
     } else {
       std::cerr << "Error! You must provide input & output file arguments\n\n"
