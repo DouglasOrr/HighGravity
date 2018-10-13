@@ -5,18 +5,18 @@ RUN apt-get update \
        clang \
        cmake \
        g++ \
-       git-core \
+       lldb \
        ninja-build \
-       libboost-all-dev \
+       wget \
     && apt-get clean
 
 # Default compiler to clang
 RUN update-alternatives --set c++ /usr/bin/clang++ \
     && update-alternatives --set cc /usr/bin/clang
 
-# Install Catch2
-RUN git clone https://github.com/catchorg/Catch2.git --branch v2.4.1 /tmp/catch \
-    && cd /tmp/catch \
-    && cmake -Bbuild -H. -DBUILD_TESTING=OFF \
-    && cmake --build build/ --target install \
-    && rm -r /tmp/catch
+# Install header-only libraries
+RUN cd /usr/include \
+    && mkdir catch2 nlohmann cxxopts \
+    && wget https://raw.githubusercontent.com/catchorg/Catch2/v2.4.1/single_include/catch2/catch.hpp -qO catch2/catch.hpp \
+    && wget https://raw.githubusercontent.com/nlohmann/json/v3.3.0/single_include/nlohmann/json.hpp -qO nlohmann/json.hpp \
+    && wget https://raw.githubusercontent.com/jarro2783/cxxopts/v2.1.1/include/cxxopts.hpp -qO cxxopts/cxxopts.hpp

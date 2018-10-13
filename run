@@ -1,1 +1,75 @@
-docker run --rm -it -v `pwd`:/work -w /work highgravity ${@}
+#!/usr/bin/env python3
+
+import argparse
+import os
+import subprocess
+
+
+def sh(_cmd, *args, **kwargs):
+    exit_code = subprocess.call(_cmd.format(*args, **kwargs), shell=True)
+    if exit_code:
+        exit(exit_code)
+
+
+BUILD = 'build'
+IMAGE = 'highgravity'
+
+
+def docker(_cmd, *args, _docker_args='', **kwargs):
+    sh('docker run {docker_args} --rm -it -v `pwd`:/work -w /work {image} {}',
+       _cmd.format(*args, **kwargs),
+       docker_args=_docker_args,
+       image=IMAGE)
+
+
+def prepare():
+    """Build the Docker image"""
+    sh('docker build --rm -t {image} {dir}', image=IMAGE, dir=os.path.dirname(__file__))
+
+
+def run(args):
+    """Run an arbitrary command in Docker"""
+    docker(' '.join(args))
+
+
+def cmake(target):
+    docker('cmake -GNinja -B{build} -H. -DCMAKE_BUILD_TYPE=debug', build=BUILD)
+    docker('cmake --build {build} --target {target}', build=BUILD, target=target)
+
+
+def check():
+    """Run the unit tests"""
+    cmake('tests')
+    docker('./{build}/tests', build=BUILD)
+
+
+def render(args, debug):
+    """Render a scene"""
+    cmake('render')
+    cmd = './{build}/render {args}'.format(build=BUILD, args=' '.join(args))
+    if debug:
+        docker('lldb -bo run {}', cmd, _docker_args='--privileged')
+    else:
+        docker(cmd)
+
+
+parser = argparse.ArgumentParser('Docker runner script for common tasks')
+parser.set_defaults(action=lambda: parser.print_help())
+subparsers = parser.add_subparsers()
+
+subparsers.add_parser('prepare', help=prepare.__doc__).set_defaults(action=prepare)
+
+p = subparsers.add_parser('run', help=run.__doc__)
+p.add_argument('args', nargs='*')
+p.set_defaults(action=run)
+
+subparsers.add_parser('check', help=check.__doc__).set_defaults(action=check)
+
+p = subparsers.add_parser('render', help=render.__doc__)
+p.add_argument('args', nargs='*')
+p.add_argument('-d', '--debug', action='store_true', help='start under LLDB')
+p.set_defaults(action=render)
+
+args = vars(parser.parse_args())
+action = args.pop('action')
+action(**args)

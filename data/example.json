@@ -1,0 +1,29 @@
+{
+    "camera": {
+        "position": [-10, 0, 0],
+        "orientation": [1, 0, 0],
+        "fov": 1.57
+    },
+    "root": {
+        "type": "group",
+        "children": [
+            {
+                "type": "plane",
+                "position": [0, 0, -5],
+                "normal": [0, 0, 1]
+            },
+            {
+                "type": "group",
+                "position": [0, 0, 0],
+                "radius": 10,
+                "children": [
+                    {
+                        "type": "sphere",
+                        "position": [0, 0, 0],
+                        "radius": 5
+                    }
+                ]
+            }
+        ]
+    }
+}

@@ -1,7 +1,0 @@
-set -e
-BUILD=build
-mkdir -p ${BUILD}
-
-./run cmake -GNinja -B${BUILD} -H. -DCMAKE_BUILD_TYPE=debug
-./run cmake --build ${BUILD} --target tests
-./run ./build/tests
