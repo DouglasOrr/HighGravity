@@ -67,15 +67,24 @@ namespace high_gravity {
     static Ambient from_json(const nlohmann::json&);
   };
 
+  struct Light {
+    geometry::Vector3 position;
+    Colour colour;
+    static Light from_json(const nlohmann::json&);
+  };
+
   struct Material {
     Colour colour;
+    float diffuse;
+    float specular;
+    float specular_power;
+    float reflection;
     static Material from_json(const nlohmann::json&);
   };
 
   struct Group;
-  struct Light;
   struct Body;
-  typedef std::variant<Group, Body, Light> Object;
+  typedef std::variant<Group, Body> Object;
   Object object_from_json(const nlohmann::json&);
 
   struct Group {
@@ -90,15 +99,10 @@ namespace high_gravity {
     static Body from_json(const nlohmann::json&);
   };
 
-  struct Light {
-    geometry::Vector3 position;
-    Colour colour;
-    static Light from_json(const nlohmann::json&);
-  };
-
   struct Scene {
     Camera camera;
     Ambient ambient;
+    std::vector<Light> lights;
     Object root;
     static Scene from_json(const nlohmann::json&);
   };

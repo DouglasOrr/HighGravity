@@ -7,35 +7,56 @@
         "aspect": 1.5
     },
     "ambient": {
-        "colour": [0.1, 0.1, 0.1]
+        "colour": [0.02, 0.02, 0.02]
     },
+    "lights": [
+        {
+            "position": [-10, 10, 10],
+            "colour": [0.9, 0.9, 0.9]
+        }
+    ],
     "root": {
         "type": "group",
         "children": [
             {
-                "type": "light",
-                "position": [10, 10, 20],
-                "colour": [0.9, 0.9, 0.9]
-            },
-            {
                 "type": "plane",
-                "position": [0, 0, -5],
+                "position": [0, 0, -3],
                 "normal": [0, 0, 1],
                 "material": {
-                    "colour": [0.8, 0.8, 0.8]
+                    "colour": [0.9, 0.9, 0.9],
+                    "diffuse": 0.4,
+                    "specular": 0.3,
+                    "specular_power": 10,
+                    "reflection": 1.0
                 }
             },
             {
                 "type": "group",
                 "position": [0, 0, 0],
-                "radius": 10,
+                "radius": 6,
                 "children": [
                     {
                         "type": "sphere",
-                        "position": [0, 0, 0],
-                        "radius": 5,
+                        "position": [0, 3, 0],
+                        "radius": 3,
                         "material": {
-                            "colour": [0.2, 0.3, 1.0]
+                            "colour": [0.2, 0.3, 1.0],
+                            "diffuse": 0.4,
+                            "specular": 1.0,
+                            "specular_power": 10,
+                            "reflection": 0.8
+                        }
+                    },
+                    {
+                        "type": "sphere",
+                        "position": [0, -3, 0],
+                        "radius": 3,
+                        "material": {
+                            "colour": [1.0, 0.3, 0.2],
+                            "diffuse": 0.4,
+                            "specular": 1.0,
+                            "specular_power": 10,
+                            "reflection": 0.8
                         }
                     }
                 ]

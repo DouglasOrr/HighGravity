@@ -11,10 +11,21 @@ namespace high_gravity {
 
   // *** Utility & IO ***
 
+  namespace {
+    template<class T, class UnaryOperation>
+    std::vector<T> from_json_to_vector(const json& j, UnaryOperation op) {
+      std::vector<T> items;
+      items.reserve(j.size());
+      std::transform(j.begin(), j.end(), std::back_inserter(items), op);
+      return items;
+    }
+
+  } // namespace (anonymous)
+
   std::ostream& operator<<(std::ostream& out, const Colour& colour) {
-    return out << "rgba=(" << colour.r
+    return out << "rgb=(" << colour.r
                << ", " << colour.g
-               << ", " << colour.b;
+               << ", " << colour.b << ")";
   }
 
   Colour Colour::from_json(const json& j) {
@@ -69,20 +80,19 @@ namespace high_gravity {
   }
 
   Material Material::from_json(const json& j) {
-    return {Colour::from_json(j["colour"])};
+    return {Colour::from_json(j["colour"]),
+            j["diffuse"],
+            j["specular"],
+            j["specular_power"],
+            j["reflection"]};
   }
 
   Group Group::from_json(const json& j) {
-    auto jchildren = j["children"];
-    std::vector<Object> children;
-    children.reserve(jchildren.size());
-    std::transform(jchildren.begin(), jchildren.end(), std::back_inserter(children),
-                   &object_from_json);
     std::optional<geometry::Sphere> bounds;
     if (j.find("position") != j.end()) {
       bounds = geometry::Sphere::from_json(j);
     }
-    return {std::move(children), std::move(bounds)};
+    return {from_json_to_vector<Object>(j["children"], &object_from_json), std::move(bounds)};
   }
 
   Light Light::from_json(const json& j) {
@@ -99,17 +109,16 @@ namespace high_gravity {
     auto type = j["type"].get<std::string>();
     if (type == "group") {
       return Group::from_json(j);
-    } else if (type == "light") {
-      return Light::from_json(j);
     } else {
       return Body::from_json(j);
     }
   }
 
-  Scene Scene::from_json(const json& jroot) {
-    return {Camera::from_json(jroot["camera"]),
-            Ambient::from_json(jroot["ambient"]),
-            object_from_json(jroot["root"])};
+  Scene Scene::from_json(const json& j) {
+    return {Camera::from_json(j["camera"]),
+            Ambient::from_json(j["ambient"]),
+            from_json_to_vector<Light>(j["lights"], &Light::from_json),
+            object_from_json(j["root"])};
   }
 
 #ifdef HIG_TESTING
@@ -172,30 +181,35 @@ namespace high_gravity {
     REQUIRE(scene.camera.fov == 1.57_a);
     REQUIRE(scene.camera.aspect == 1.5_a);
     // Ambient
-    REQUIRE_THAT(scene.ambient.colour, (ApproxColour({0.1, 0.1, 0.1})));
+    REQUIRE_THAT(scene.ambient.colour, (ApproxColour({0.02, 0.02, 0.02})));
+    // Lights
+    REQUIRE(scene.lights.size() == 1);
+    REQUIRE_THAT(scene.lights[0].position, (ApproxVector3({-10, 10, 10})));
+    REQUIRE_THAT(scene.lights[0].colour, (ApproxColour({0.9, 0.9, 0.9})));
     // Root
     auto& root = std::get<Group>(scene.root);
     REQUIRE(not root.bounds);
-    REQUIRE(root.children.size() == 3);
-    auto& light = std::get<Light>(root.children[0]);
-    REQUIRE_THAT(light.position, (ApproxVector3({10, 10, 20})));
-    REQUIRE_THAT(light.colour, (ApproxColour({0.9, 0.9, 0.9})));
+    REQUIRE(root.children.size() == 2);
     // Plane
-    auto& plane_body = std::get<Body>(root.children[1]);
-    REQUIRE_THAT(plane_body.material.colour, (ApproxColour({0.8, 0.8, 0.8})));
+    auto& plane_body = std::get<Body>(root.children[0]);
+    REQUIRE_THAT(plane_body.material.colour, (ApproxColour({0.9, 0.9, 0.9})));
+    REQUIRE(plane_body.material.diffuse == 0.4_a);
+    REQUIRE(plane_body.material.specular == 0.3_a);
+    REQUIRE(plane_body.material.specular_power == 10_a);
+    REQUIRE(plane_body.material.reflection == 1_a);
     auto& plane = std::get<geometry::Plane>(plane_body.shape);
-    REQUIRE_THAT(plane.position, (ApproxVector3({0, 0, -5})));
+    REQUIRE_THAT(plane.position, (ApproxVector3({0, 0, -3})));
     REQUIRE_THAT(plane.normal, (ApproxVector3({0, 0, 1})));
     // Group
-    auto& group = std::get<Group>(root.children[2]);
-    REQUIRE(group.bounds->radius == 10_a);
+    auto& group = std::get<Group>(root.children[1]);
+    REQUIRE(group.bounds->radius == 6_a);
     REQUIRE_THAT(group.bounds->position, (ApproxVector3({0, 0, 0})));
-    REQUIRE(group.children.size() == 1);
+    REQUIRE(group.children.size() == 2);
     auto& sphere_body = std::get<Body>(group.children[0]);
     REQUIRE_THAT(sphere_body.material.colour, (ApproxColour({0.2, 0.3, 1.0})));
     auto& sphere = std::get<geometry::Sphere>(sphere_body.shape);
-    REQUIRE_THAT(sphere.position, (ApproxVector3({0, 0, 0})));
-    REQUIRE(sphere.radius == 5_a);
+    REQUIRE_THAT(sphere.position, (ApproxVector3({0, 3, 0})));
+    REQUIRE(sphere.radius == 3_a);
   }
 
 #endif // HIG_TESTING
@@ -250,6 +264,7 @@ namespace high_gravity {
 
     struct Collision {
       float distance;
+      bool internal;
       const Body* body;
     };
     bool operator<(const Collision& a, const Collision& b) {
@@ -278,9 +293,10 @@ namespace high_gravity {
         return std::nullopt;
       }
       std::optional<Collision> operator()(const Body& body) const {
-        auto distance = (*this)(body.shape);
-        if (distance) {
-          return Collision{*distance, &body};
+        auto collision = (*this)(body.shape);
+        if (collision) {
+          collision->body = &body;
+          return collision;
         }
         return std::nullopt;
       }
@@ -289,10 +305,10 @@ namespace high_gravity {
         return std::nullopt;
       }
       // Shapes
-      std::optional<float> operator()(const geometry::Shape& shape) const {
+      std::optional<Collision> operator()(const geometry::Shape& shape) const {
         return std::visit(*this, shape);
       }
-      std::optional<float> operator()(const geometry::Sphere& sphere) const {
+      std::optional<Collision> operator()(const geometry::Sphere& sphere) const {
         auto relative = sphere.position - ray.start;
         auto d_closest = dot(relative, ray.direction);
         auto discriminant = d_closest * d_closest + sphere.radius * sphere.radius - dot(relative, relative);
@@ -303,16 +319,16 @@ namespace high_gravity {
         auto sqrt_discriminant = std::sqrt(discriminant);
         if (0 < d_closest - sqrt_discriminant) {
           // We're outside the sphere, so return the smaller distance (hitting the outside)
-          return d_closest - sqrt_discriminant;
+          return Collision{d_closest - sqrt_discriminant, false, nullptr};
         }
         if (0 < d_closest + sqrt_discriminant) {
           // We're inside the sphere, so return the larger distance (hitting the inside)
-          return d_closest + sqrt_discriminant;
+          return Collision{d_closest + sqrt_discriminant, true, nullptr};
         }
         // The ray intersects the sphere only in the past
         return std::nullopt;
       }
-      std::optional<float> operator()(const geometry::Plane& plane) const {
+      std::optional<Collision> operator()(const geometry::Plane& plane) const {
         auto height = dot(plane.normal, plane.position - ray.start);
         auto v_component = dot(plane.normal, ray.direction);//length(cross(plane.normal, ray.direction));
         if (v_component == 0) {
@@ -321,25 +337,64 @@ namespace high_gravity {
         }
         auto distance = height / v_component;
         // Exclude collisions that happen in the past
-        return 0 < distance ? std::optional<float>(distance) : std::nullopt;
+        return 0 < distance ? std::optional<Collision>({distance, height > 0, nullptr}) : std::nullopt;
+      }
+    };
+
+    struct GetNormal {
+      geometry::Vector3 position;
+      geometry::Vector3 operator()(const Body& body) {
+        return std::visit(*this, body.shape);
+      }
+      geometry::Vector3 operator()(const geometry::Sphere& sphere) {
+        return normalize(position - sphere.position);
+      }
+      geometry::Vector3 operator()(const geometry::Plane& plane) {
+        return plane.normal;
       }
     };
 
     Colour blend(const Colour& src, const Colour& other, float weight) {
-      return {src.r * weight * other.r,
-              src.g * weight * other.g,
-              src.b * weight * other.b};
+      return {weight * src.r * other.r,
+              weight * src.g * other.g,
+              weight * src.b * other.b};
+    }
+    Colour operator+(const Colour& left, const Colour& right) {
+      return {left.r + right.r, left.g + right.g, left.b + right.b};
     }
 
     Colour trace_ray(const Scene& scene, const Ray& ray) {
-      std::cerr << "Tracing " << ray << std::endl;
+      static const auto Delta = 0.1f;
       if (ray.ttl == 0) {
         return {0, 0, 0}; // expired ray fallback
       }
       auto collision = CollisionDetection{ray}(scene.root);
       if (collision) {
-        Colour ambient = blend(collision->body->material.colour, scene.ambient.colour, 1.0f);
-        return ambient;
+        auto& material = collision->body->material;
+        auto position = ray.start + collision->distance * ray.direction;
+        auto normal = (collision->internal ? -1 : 1) * GetNormal{position}(*(collision->body));
+        auto position_outside = position + Delta * normal;
+        auto reflection = ray.direction - (2 * dot(ray.direction, normal)) * normal;
+
+        // Ambient
+        auto colour = blend(material.colour, scene.ambient.colour, 1.0f);
+        // Lighting
+        for (auto& light : scene.lights) {
+          auto light_direction = normalize(light.position - position_outside);
+          auto shadow = CollisionDetection{Ray{0, position_outside, light_direction}}(scene.root);
+          if (not shadow) {
+            auto diffuse = material.diffuse * std::max(0.0f, dot(light_direction, normal));
+            auto specular = material.specular * pow(std::max(0.0f, dot(light_direction, reflection)),
+                                                    material.specular_power);
+            colour = colour + blend(material.colour, light.colour, diffuse + specular);
+          }
+        }
+        // Reflection
+        {
+          auto child = trace_ray(scene, Ray{ray.ttl - 1, position_outside, reflection});
+          colour = colour + blend(material.colour, child, material.reflection);
+        }
+        return colour;
       }
       return {0, 0, 0}; // "miss" background fallback
     }
@@ -349,8 +404,9 @@ namespace high_gravity {
   // *** Core ***
 
   Image render(const Scene& scene, unsigned width) {
-    static const auto StartingTtl = 2u;
+    static const auto StartingTtl = 3u;
     auto height = static_cast<unsigned>(width / scene.camera.aspect);
+    Image image(width, height);
 
     auto camera_z = normalize(scene.camera.forward);
     auto up = normalize(orthogonal_component(scene.camera.up, camera_z));
@@ -358,7 +414,6 @@ namespace high_gravity {
     auto camera_x = w * cross(camera_z, up);
     auto camera_y = (w / scene.camera.aspect) * up;
 
-    Image image(width, height);
     for (auto y = 0u; y < height; ++y) {
       for (auto x = 0u; x < width; ++x) {
         auto dy = 0.5f - static_cast<float>(y) / (height - 1);
