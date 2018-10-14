@@ -78,7 +78,7 @@ namespace {
         pixel_data[0] = pixel_float_to_char(pixel.b);
         pixel_data[1] = pixel_float_to_char(pixel.g);
         pixel_data[2] = pixel_float_to_char(pixel.r);
-        pixel_data[3] = pixel_float_to_char(pixel.a);
+        pixel_data[3] = 0xff;
         out.write(pixel_data, 4);
       }
     }

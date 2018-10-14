@@ -12,7 +12,7 @@ namespace high_gravity {
   // *** Image API ***
 
   struct Colour {
-    float r, g, b, a;
+    float r, g, b;
     static Colour from_json(const nlohmann::json&);
   };
   std::ostream& operator<<(std::ostream&, const Colour&);
@@ -75,7 +75,7 @@ namespace high_gravity {
   struct Group;
   struct Light;
   struct Body;
-  typedef std::variant<Group, Light, Body> Object;
+  typedef std::variant<Group, Body, Light> Object;
   Object object_from_json(const nlohmann::json&);
 
   struct Group {
@@ -84,16 +84,16 @@ namespace high_gravity {
     static Group from_json(const nlohmann::json&);
   };
 
-  struct Light {
-    geometry::Vector3 position;
-    Colour colour;
-    static Light from_json(const nlohmann::json&);
-  };
-
   struct Body {
     geometry::Shape shape;
     Material material;
     static Body from_json(const nlohmann::json&);
+  };
+
+  struct Light {
+    geometry::Vector3 position;
+    Colour colour;
+    static Light from_json(const nlohmann::json&);
   };
 
   struct Scene {

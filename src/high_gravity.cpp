@@ -14,13 +14,12 @@ namespace high_gravity {
   std::ostream& operator<<(std::ostream& out, const Colour& colour) {
     return out << "rgba=(" << colour.r
                << ", " << colour.g
-               << ", " << colour.b
-               << ", " << colour.a << ")";
+               << ", " << colour.b;
   }
 
   Colour Colour::from_json(const json& j) {
-    // r g b a
-    return {j[0], j[1], j[2], j[3]};
+    // r g b
+    return {j[0], j[1], j[2]};
   }
 
   namespace geometry {
@@ -118,16 +117,18 @@ namespace high_gravity {
   using namespace Catch::literals;
 
   struct ApproxColour : Catch::MatcherBase<Colour> {
-    constexpr static float Tolerance = 0.01;
+  private:
     Colour m_expected;
+
+  public:
+    constexpr static float Tolerance = 0.01;
 
     explicit ApproxColour(Colour expected) : m_expected(expected) { }
 
     virtual bool match(const Colour& actual) const override {
       return (std::abs(m_expected.r - actual.r) < Tolerance)
-        && (std::abs(m_expected.g - actual.g) < Tolerance)
-        && (std::abs(m_expected.b - actual.b) < Tolerance)
-        && (std::abs(m_expected.a - actual.a) < Tolerance);
+        and (std::abs(m_expected.g - actual.g) < Tolerance)
+        and (std::abs(m_expected.b - actual.b) < Tolerance);
     }
 
     virtual std::string describe() const override {
@@ -138,15 +139,18 @@ namespace high_gravity {
   };
 
   struct ApproxVector3 : Catch::MatcherBase<geometry::Vector3> {
-    constexpr static float Tolerance = 0.01;
+  private:
     geometry::Vector3 m_expected;
+
+  public:
+    constexpr static float Tolerance = 0.01;
 
     explicit ApproxVector3(geometry::Vector3 expected) : m_expected(expected) { }
 
     virtual bool match(const geometry::Vector3& actual) const override {
       return (std::abs(m_expected.x - actual.x) < Tolerance)
-        && (std::abs(m_expected.y - actual.y) < Tolerance)
-        && (std::abs(m_expected.z - actual.z) < Tolerance);
+        and (std::abs(m_expected.y - actual.y) < Tolerance)
+        and (std::abs(m_expected.z - actual.z) < Tolerance);
     }
 
     virtual std::string describe() const override {
@@ -168,27 +172,27 @@ namespace high_gravity {
     REQUIRE(scene.camera.fov == 1.57_a);
     REQUIRE(scene.camera.aspect == 1.5_a);
     // Ambient
-    REQUIRE_THAT(scene.ambient.colour, (ApproxColour({0.1, 0.1, 0.1, 1.0})));
+    REQUIRE_THAT(scene.ambient.colour, (ApproxColour({0.1, 0.1, 0.1})));
     // Root
     auto& root = std::get<Group>(scene.root);
     REQUIRE(not root.bounds);
     REQUIRE(root.children.size() == 3);
     auto& light = std::get<Light>(root.children[0]);
     REQUIRE_THAT(light.position, (ApproxVector3({10, 10, 20})));
-    REQUIRE_THAT(light.colour, (ApproxColour({0.9, 0.9, 0.9, 1.0})));
+    REQUIRE_THAT(light.colour, (ApproxColour({0.9, 0.9, 0.9})));
     // Plane
     auto& plane_body = std::get<Body>(root.children[1]);
-    REQUIRE_THAT(plane_body.material.colour, (ApproxColour({0.8, 0.8, 0.8, 1.0})));
+    REQUIRE_THAT(plane_body.material.colour, (ApproxColour({0.8, 0.8, 0.8})));
     auto& plane = std::get<geometry::Plane>(plane_body.shape);
     REQUIRE_THAT(plane.position, (ApproxVector3({0, 0, -5})));
     REQUIRE_THAT(plane.normal, (ApproxVector3({0, 0, 1})));
     // Group
     auto& group = std::get<Group>(root.children[2]);
-    REQUIRE(group.bounds.value().radius == 10_a);
-    REQUIRE_THAT(group.bounds.value().position, (ApproxVector3({0, 0, 0})));
+    REQUIRE(group.bounds->radius == 10_a);
+    REQUIRE_THAT(group.bounds->position, (ApproxVector3({0, 0, 0})));
     REQUIRE(group.children.size() == 1);
     auto& sphere_body = std::get<Body>(group.children[0]);
-    REQUIRE_THAT(sphere_body.material.colour, (ApproxColour({0.2, 0.3, 1.0, 1.0})));
+    REQUIRE_THAT(sphere_body.material.colour, (ApproxColour({0.2, 0.3, 1.0})));
     auto& sphere = std::get<geometry::Sphere>(sphere_body.shape);
     REQUIRE_THAT(sphere.position, (ApproxVector3({0, 0, 0})));
     REQUIRE(sphere.radius == 5_a);
@@ -196,17 +200,172 @@ namespace high_gravity {
 
 #endif // HIG_TESTING
 
+  namespace {
+
+    float dot(const geometry::Vector3& a, const geometry::Vector3& b) {
+      return a.x * b.x + a.y * b.y + a.z * b.z;
+    }
+
+    geometry::Vector3 cross(const geometry::Vector3& a, const geometry::Vector3& b) {
+      return {a.y * b.z - a.z * b.y,
+              a.z * b.x - a.x * b.z,
+              a.x * b.y - b.x * a.y};
+    }
+
+    float length(const geometry::Vector3& v) {
+      return std::sqrt(dot(v, v));
+    }
+
+    geometry::Vector3 operator*(float a, const geometry::Vector3& b) {
+      return {a * b.x, a * b.y, a * b.z};
+    }
+
+    geometry::Vector3 operator+(const geometry::Vector3& a, const geometry::Vector3& b) {
+      return {a.x + b.x, a.y + b.y, a.z + b.z};
+    }
+
+    geometry::Vector3 operator-(const geometry::Vector3& a, const geometry::Vector3& b) {
+      return {a.x - b.x, a.y - b.y, a.z - b.z};
+    }
+
+    geometry::Vector3 orthogonal_component(const geometry::Vector3& a, const geometry::Vector3& b) {
+      float d = dot(a, b);
+      return {a.x - d * b.x, a.y - d * b.y, a.z - d * b.z};
+    }
+
+    geometry::Vector3 normalize(const geometry::Vector3& v) {
+      return (1 / length(v)) * v;
+    }
+
+    struct Ray {
+      unsigned ttl;
+      geometry::Vector3 start;
+      geometry::Vector3 direction;
+    };
+    std::ostream& operator<<(std::ostream& out, const Ray& ray) {
+      return out << "Ray{ttl:" << ray.ttl
+                 << ", start:" << ray.start
+                 << ", direction:" << ray.direction << "}";
+    }
+
+    struct Collision {
+      float distance;
+      const Body* body;
+    };
+    bool operator<(const Collision& a, const Collision& b) {
+      return a.distance < b.distance;
+    }
+
+    struct CollisionDetection {
+      Ray ray;
+      // Objects
+      std::optional<Collision> operator()(const Object& obj) const {
+        return std::visit(*this, obj);
+      }
+      std::optional<Collision> operator()(const Group& group) const {
+        // Bounds test on the group, then recursively test children
+        if ((not group.bounds) or (*this)(*group.bounds)) {
+          // Find the nearest child element collision
+          std::optional<Collision> nearest;
+          for (auto& child : group.children) {
+            auto collision = (*this)(child);
+            if (collision and ((not nearest) or (*collision < *nearest))) {
+              nearest = collision;
+            }
+          }
+          return nearest;
+        }
+        return std::nullopt;
+      }
+      std::optional<Collision> operator()(const Body& body) const {
+        auto distance = (*this)(body.shape);
+        if (distance) {
+          return Collision{*distance, &body};
+        }
+        return std::nullopt;
+      }
+      std::optional<Collision> operator()(const Light&) const {
+        // There are no collisions with lights
+        return std::nullopt;
+      }
+      // Shapes
+      std::optional<float> operator()(const geometry::Shape& shape) const {
+        return std::visit(*this, shape);
+      }
+      std::optional<float> operator()(const geometry::Sphere& sphere) const {
+        auto relative = sphere.position - ray.start;
+        auto d_closest = dot(relative, ray.direction);
+        auto discriminant = d_closest * d_closest + sphere.radius * sphere.radius - dot(relative, relative);
+        if (discriminant < 0) {
+          // The ray does not intersect the sphere anywhere
+          return std::nullopt;
+        }
+        auto sqrt_discriminant = std::sqrt(discriminant);
+        if (0 < d_closest - sqrt_discriminant) {
+          // We're outside the sphere, so return the smaller distance (hitting the outside)
+          return d_closest - sqrt_discriminant;
+        }
+        if (0 < d_closest + sqrt_discriminant) {
+          // We're inside the sphere, so return the larger distance (hitting the inside)
+          return d_closest + sqrt_discriminant;
+        }
+        // The ray intersects the sphere only in the past
+        return std::nullopt;
+      }
+      std::optional<float> operator()(const geometry::Plane& plane) const {
+        auto height = dot(plane.normal, plane.position - ray.start);
+        auto v_component = dot(plane.normal, ray.direction);//length(cross(plane.normal, ray.direction));
+        if (v_component == 0) {
+          // Ray is parallel to the plane - no intersection
+          return std::nullopt;
+        }
+        auto distance = height / v_component;
+        // Exclude collisions that happen in the past
+        return 0 < distance ? std::optional<float>(distance) : std::nullopt;
+      }
+    };
+
+    Colour blend(const Colour& src, const Colour& other, float weight) {
+      return {src.r * weight * other.r,
+              src.g * weight * other.g,
+              src.b * weight * other.b};
+    }
+
+    Colour trace_ray(const Scene& scene, const Ray& ray) {
+      std::cerr << "Tracing " << ray << std::endl;
+      if (ray.ttl == 0) {
+        return {0, 0, 0}; // expired ray fallback
+      }
+      auto collision = CollisionDetection{ray}(scene.root);
+      if (collision) {
+        Colour ambient = blend(collision->body->material.colour, scene.ambient.colour, 1.0f);
+        return ambient;
+      }
+      return {0, 0, 0}; // "miss" background fallback
+    }
+
+  } // namespace (anon)
+
   // *** Core ***
 
   Image render(const Scene& scene, unsigned width) {
-    unsigned height = static_cast<unsigned>(width / scene.camera.aspect);
+    static const auto StartingTtl = 2u;
+    auto height = static_cast<unsigned>(width / scene.camera.aspect);
+
+    auto camera_z = normalize(scene.camera.forward);
+    auto up = normalize(orthogonal_component(scene.camera.up, camera_z));
+    auto w = 2 * std::tan(scene.camera.fov / 2);
+    auto camera_x = w * cross(camera_z, up);
+    auto camera_y = (w / scene.camera.aspect) * up;
+
     Image image(width, height);
-    // TODO: replace fake rendering
     for (auto y = 0u; y < height; ++y) {
       for (auto x = 0u; x < width; ++x) {
-        float g = static_cast<float>(y) / (height - 1);
-        float b = static_cast<float>(x) / (width - 1);
-        image(x, y) = {0, g, b, 1};
+        auto dy = 0.5f - static_cast<float>(y) / (height - 1);
+        auto dx = static_cast<float>(x) / (width - 1) - 0.5f;
+        image(x, y) = trace_ray(scene, Ray{StartingTtl,
+                                           scene.camera.position,
+                                           normalize(camera_z + dy * camera_y + dx * camera_x)});
       }
     }
     return image;
