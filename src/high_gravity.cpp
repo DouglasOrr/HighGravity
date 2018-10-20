@@ -1,6 +1,7 @@
 #include "high_gravity.hpp"
 #include <catch2/catch.hpp>
 #include <nlohmann/json.hpp>
+#include <parallel/algorithm>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -446,16 +447,21 @@ namespace high_gravity {
     auto camera_x = w * cross(camera_z, up);
     auto camera_y = (w / scene.camera.aspect) * up;
 
+    std::vector<std::tuple<unsigned, unsigned> > indices;
     for (auto y = 0u; y < height; ++y) {
       for (auto x = 0u; x < width; ++x) {
-        auto dy = 0.5f - static_cast<float>(y) / (height - 1);
-        auto dx = static_cast<float>(x) / (width - 1) - 0.5f;
-        image(x, y) = trace_ray(scene, Ray{StartingTtl,
-                                           scene.camera.position,
-                                           normalize(camera_z + dy * camera_y + dx * camera_x),
-                                           1.f});
+        indices.push_back(std::make_tuple(x, y));
       }
     }
+    std::__parallel::transform(indices.begin(), indices.end(), image.pixels.begin(),
+                               [&](const std::tuple<unsigned, unsigned>& xy) {
+                                 auto dx = static_cast<float>(std::get<0>(xy)) / (width - 1) - 0.5f;
+                                 auto dy = 0.5f - static_cast<float>(std::get<1>(xy)) / (height - 1);
+                                 return trace_ray(scene, Ray{StartingTtl,
+                                                             scene.camera.position,
+                                                             normalize(camera_z + dy * camera_y + dx * camera_x),
+                                                             1.f});
+                   });
     return image;
   }
 

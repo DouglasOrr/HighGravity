@@ -2,7 +2,14 @@ FROM ubuntu:18.04
 
 RUN apt-get update \
     && apt-get install -qy \
-       clang \
+       software-properties-common \
+       wget \
+    && wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add \
+    && add-apt-repository 'deb [arch=amd64] https://apt.llvm.org/bionic/ llvm-toolchain-bionic-7 main'
+
+RUN apt-get update \
+    && apt-get install -qy \
+       clang-7 \
        cmake \
        g++ \
        lldb \
@@ -11,8 +18,8 @@ RUN apt-get update \
     && apt-get clean
 
 # Default compiler to clang
-RUN update-alternatives --set c++ /usr/bin/clang++ \
-    && update-alternatives --set cc /usr/bin/clang
+RUN update-alternatives --install /usr/bin/c++ c++ /usr/bin/clang++-7 100 \
+    && update-alternatives --install /usr/bin/cc cc /usr/bin/clang-7 100
 
 # Install header-only libraries
 RUN cd /usr/include \

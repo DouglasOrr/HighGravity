@@ -3,7 +3,7 @@ project (high_gravity)
 
 # General settings
 set (CMAKE_CXX_STANDARD 17)
-set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Werror -Wold-style-cast -fdiagnostics-color=always -Wno-unused-function")
+set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp -O3 -mtune=native -ffast-math -Wall -Wextra -Werror -Wold-style-cast -fdiagnostics-color=always -Wno-unused-function")
 
 # Programs
 add_executable (render src/high_gravity.cpp src/main_render.cpp)
