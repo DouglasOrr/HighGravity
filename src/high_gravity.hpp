@@ -63,7 +63,8 @@ namespace high_gravity {
   };
 
   struct Ambient {
-    Colour colour;
+    Colour light;
+    Colour background;
     static Ambient from_json(const nlohmann::json&);
   };
 
@@ -79,6 +80,8 @@ namespace high_gravity {
     float specular;
     float specular_power;
     float reflection;
+    float translucency;
+    float refractive_index;
     static Material from_json(const nlohmann::json&);
   };
 
